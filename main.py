@@ -71,9 +71,10 @@ async def lifespan(_: FastAPI):
     global _semaphore, _start_time
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     CONVERTED_DIR.mkdir(parents=True, exist_ok=True)
-    # Purge orphaned files left by a previous crash
+    # Purge orphaned job files left by a previous crash (skip .gitkeep etc.)
     for orphan in (*UPLOAD_DIR.iterdir(), *CONVERTED_DIR.iterdir()):
-        orphan.unlink(missing_ok=True)
+        if not orphan.name.startswith("."):
+            orphan.unlink(missing_ok=True)
     _semaphore = asyncio.Semaphore(MAX_CONCURRENT)
     _start_time = time.monotonic()
     task = asyncio.create_task(_cleanup_loop())
