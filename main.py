@@ -1,10 +1,14 @@
 import asyncio
+import logging
 import re
 import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 
 import filetype
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -207,10 +211,13 @@ async def convert(
         *(_convert_one(f, target_format, channels, sample_rate, bit_rate) for f in files),
         return_exceptions=True,
     )
-    results = [
-        r if isinstance(r, dict) else {"original": files[i].filename, "error": "Internal error"}
-        for i, r in enumerate(raw)
-    ]
+    results = []
+    for i, r in enumerate(raw):
+        if isinstance(r, dict):
+            results.append(r)
+        else:
+            log.exception("Unhandled error converting %s", files[i].filename, exc_info=r)
+            results.append({"original": files[i].filename, "error": "Internal error"})
     return {"results": results}
 
 
