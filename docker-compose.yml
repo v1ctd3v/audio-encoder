@@ -9,7 +9,9 @@ services:
 
     volumes:
       # Only the storage directory is writable; everything else is read-only
-      - ./storage:/app/storage
+      - ./storage:/app/storage:rw
+
+    user: "1001:1001"
 
     # Read-only root filesystem; writable /tmp for ffmpeg scratch space
     read_only: true
