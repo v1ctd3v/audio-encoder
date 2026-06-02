@@ -105,7 +105,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecurityHeadersMiddleware)
-app.mount("/static", StaticFiles(directory="static", html=True), name="static")
 
 
 # ── Per-file conversion ───────────────────────────────────────────────────────
@@ -265,3 +264,7 @@ def formats():
         "valid_bit_rates": sorted(VALID_BIT_RATES),
         "note": "bit_rate is ignored for lossless formats (flac, wav)",
     }
+
+
+# Mounted last so all API routes above take precedence
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
