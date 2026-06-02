@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Storage — never commit uploaded or converted audio
+storage/uploads/*
+storage/converted/*
+!storage/uploads/.gitkeep
+!storage/converted/.gitkeep
+
+# macOS
+.DS_Store

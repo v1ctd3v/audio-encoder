@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Audio Encoder</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f0f;
+      color: #e5e5e5;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 3rem 1rem;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 560px;
+    }
+
+    h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { font-size: 0.85rem; color: #888; margin-bottom: 2rem; }
+
+    label { display: block; font-size: 0.8rem; color: #aaa; margin-bottom: 0.4rem; }
+
+    /* ── Drop zone ── */
+    .drop-zone {
+      border: 2px dashed #333;
+      border-radius: 8px;
+      padding: 2rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      margin-bottom: 1.25rem;
+      position: relative;
+    }
+    .drop-zone:hover, .drop-zone.drag-over { border-color: #6366f1; }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .drop-zone .icon { font-size: 1.75rem; margin-bottom: 0.4rem; }
+    .drop-zone p { font-size: 0.85rem; color: #888; }
+    .file-list { margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; }
+    .file-chip {
+      background: #2a2a3a; border: 1px solid #3a3a5a; color: #a5b4fc;
+      border-radius: 4px; padding: 0.2rem 0.6rem;
+      font-size: 0.75rem; max-width: 200px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* ── Form controls ── */
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+    .field { margin-bottom: 1rem; }
+    select {
+      width: 100%; background: #111; border: 1px solid #333;
+      border-radius: 6px; color: #e5e5e5;
+      padding: 0.6rem 0.8rem; font-size: 0.85rem;
+      appearance: none; cursor: pointer;
+    }
+    select:focus { outline: none; border-color: #6366f1; }
+    select:disabled { opacity: 0.4; cursor: not-allowed; }
+    .section-title {
+      font-size: 0.75rem; font-weight: 600; color: #555;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      margin: 1.5rem 0 0.75rem;
+    }
+    .hint { font-size: 0.72rem; color: #555; margin-top: 0.3rem; }
+
+    button.primary {
+      width: 100%; background: #6366f1; color: white;
+      border: none; border-radius: 6px; padding: 0.75rem;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer;
+      transition: background 0.2s; margin-top: 0.5rem;
+    }
+    button.primary:hover:not(:disabled) { background: #4f51d8; }
+    button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Result cards ── */
+    .results { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
+
+    .result-card {
+      border-radius: 8px; overflow: hidden;
+    }
+    .result-card.loading {
+      background: #0f0f2d; border: 1px solid #1e3a8a; color: #93c5fd;
+      padding: 0.75rem 1rem; font-size: 0.85rem;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .result-card.error {
+      background: #2d0f0f; border: 1px solid #7f1d1d;
+      padding: 0.75rem 1rem;
+    }
+    .result-card.error .err-name { color: #fca5a5; font-size: 0.85rem; font-weight: 500; }
+    .result-card.error .err-msg  { color: #f87171; font-size: 0.78rem; margin-top: 0.2rem; }
+
+    .result-card.success {
+      background: #111; border: 1px solid #2a2a2a;
+    }
+
+    /* top row inside success card */
+    .card-header {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.7rem 0.9rem;
+      border-bottom: 1px solid #1e1e1e;
+    }
+    .card-header .file-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .card-header .fname {
+      flex: 1; font-size: 0.85rem; color: #86efac;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .dl-btn {
+      background: #166534; color: #86efac; border-radius: 4px;
+      padding: 0.3rem 0.8rem; text-decoration: none;
+      font-size: 0.78rem; font-weight: 600; white-space: nowrap; flex-shrink: 0;
+    }
+    .dl-btn:hover { background: #15803d; }
+    .dl-btn.disabled {
+      background: #1a2a1a; color: #4a7a4a; pointer-events: none;
+    }
+
+    .ttl-badge {
+      font-size: 0.72rem; font-weight: 600; font-variant-numeric: tabular-nums;
+      color: #86efac; background: #0d2a1a; border: 1px solid #166534;
+      border-radius: 4px; padding: 0.2rem 0.5rem; flex-shrink: 0; white-space: nowrap;
+      transition: color 0.3s, background 0.3s, border-color 0.3s;
+    }
+    .ttl-badge.warning {
+      color: #fcd34d; background: #2a1f00; border-color: #92400e;
+    }
+    .ttl-badge.expired {
+      color: #f87171; background: #2d0f0f; border-color: #7f1d1d;
+    }
+    .result-card.success.expired-card {
+      border-color: #3a1a1a; opacity: 0.6;
+    }
+    .result-card.success.expired-card .play-btn {
+      background: #333; cursor: not-allowed;
+    }
+
+    /* ── Audio player ── */
+    .player {
+      padding: 0.75rem 0.9rem;
+      display: flex; align-items: center; gap: 0.75rem;
+    }
+
+    .play-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: #6366f1; border: none; color: white;
+      font-size: 0.9rem; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .play-btn:hover { background: #4f51d8; }
+
+    .player-middle { flex: 1; min-width: 0; }
+
+    .progress-wrap {
+      position: relative; height: 4px; background: #2a2a2a;
+      border-radius: 2px; cursor: pointer; margin-bottom: 0.35rem;
+    }
+    .progress-fill {
+      height: 100%; background: #6366f1; border-radius: 2px;
+      width: 0%; transition: width 0.1s linear; pointer-events: none;
+    }
+    .progress-wrap:hover .progress-fill { background: #818cf8; }
+
+    .time-row {
+      display: flex; justify-content: space-between;
+      font-size: 0.7rem; color: #666;
+    }
+
+    .vol-wrap {
+      display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;
+    }
+    .vol-icon { font-size: 0.8rem; color: #666; cursor: pointer; }
+    input[type="range"].vol {
+      -webkit-appearance: none; appearance: none;
+      width: 64px; height: 3px; background: #333; border-radius: 2px; cursor: pointer;
+      outline: none;
+    }
+    input[type="range"].vol::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 12px; height: 12px;
+      border-radius: 50%; background: #6366f1; cursor: pointer;
+    }
+
+    /* ── Progress bar touch target ── */
+    .progress-wrap { height: 4px; }
+    @media (pointer: coarse) {
+      /* Enlarge the seek hit area on touch screens without changing visual height */
+      .progress-wrap {
+        padding: 10px 0;
+        margin: -10px 0;
+      }
+      /* Larger thumb for fat fingers */
+      input[type="range"].vol::-webkit-slider-thumb {
+        width: 18px; height: 18px;
+      }
+    }
+
+    /* ── Spinner + loading scan line ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 16px; height: 16px; border: 2px solid #1e3a8a;
+      border-top-color: #93c5fd; border-radius: 50%;
+      animation: spin 0.7s linear infinite; flex-shrink: 0;
+    }
+    @keyframes scan {
+      0%   { left: -50%; }
+      100% { left: 110%; }
+    }
+    .result-card.loading {
+      position: relative; overflow: hidden;
+    }
+    .result-card.loading::after {
+      content: ''; position: absolute;
+      bottom: 0; left: -50%; width: 50%; height: 2px;
+      background: linear-gradient(90deg, transparent, #6366f1, transparent);
+      animation: scan 1.4s ease-in-out infinite;
+    }
+
+    /* ── Clear button ── */
+    .clear-btn {
+      display: block; margin: 0.5rem auto 0;
+      background: none; border: none; color: #555;
+      font-size: 0.78rem; cursor: pointer; padding: 0.25rem 0.5rem;
+      transition: color 0.15s;
+    }
+    .clear-btn:hover { color: #aaa; }
+
+    /* ── Mobile ── */
+    @media (max-width: 480px) {
+      body { padding: 0; align-items: stretch; }
+
+      .card {
+        border-radius: 0; border-left: none; border-right: none;
+        padding: 1.25rem 1rem;
+        min-height: 100vh;
+      }
+
+      /* Stack the two-column settings row */
+      .row { grid-template-columns: 1fr; gap: 0; margin-bottom: 0; }
+
+      /* Card header: wrap filename onto its own line, controls on the next */
+      .card-header { flex-wrap: wrap; gap: 0.5rem; }
+      .card-header .fname { width: 100%; order: -1; }
+
+      /* Hide the volume slider — mobile uses system volume */
+      .vol-wrap { display: none; }
+
+      /* Give the play button a slightly larger tap target */
+      .play-btn { width: 40px; height: 40px; font-size: 1rem; }
+
+      .section-title { margin-top: 1rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Audio Encoder</h1>
+  <p class="subtitle">Convert and play audio — FLAC, WAV, MP3, OGG, AAC</p>
+
+  <label>Audio files (up to 10)</label>
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".mp3,.wav,.flac,.ogg,.aac,.m4a,.wma,.opus,.webm" multiple />
+    <div class="icon">🎵</div>
+    <p>Drop files here or click to browse</p>
+    <div class="file-list" id="fileList"></div>
+  </div>
+
+  <div class="field">
+    <label for="formatSelect">Target format</label>
+    <select id="formatSelect">
+      <option value="flac">FLAC — lossless, large</option>
+      <option value="wav">WAV — lossless, uncompressed</option>
+      <option value="mp3">MP3 — lossy, widely compatible</option>
+      <option value="ogg">OGG Vorbis — lossy, open</option>
+      <option value="aac">AAC — lossy, efficient</option>
+    </select>
+  </div>
+
+  <div class="section-title">Audio settings (optional)</div>
+
+  <div class="row">
+    <div class="field">
+      <label for="channelsSelect">Channels</label>
+      <select id="channelsSelect">
+        <option value="">— keep original —</option>
+        <option value="1">Mono (1ch)</option>
+        <option value="2">Stereo (2ch)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="sampleRateSelect">Sample rate</label>
+      <select id="sampleRateSelect">
+        <option value="">— keep original —</option>
+        <option value="8000">8 000 Hz</option>
+        <option value="16000">16 000 Hz</option>
+        <option value="22050">22 050 Hz</option>
+        <option value="44100">44 100 Hz (CD)</option>
+        <option value="48000">48 000 Hz (broadcast)</option>
+        <option value="88200">88 200 Hz</option>
+        <option value="96000">96 000 Hz (hi-res)</option>
+        <option value="192000">192 000 Hz (hi-res)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="bitRateSelect">Bit rate</label>
+    <select id="bitRateSelect">
+      <option value="">— keep default —</option>
+      <option value="64k">64 kbps — low</option>
+      <option value="96k">96 kbps</option>
+      <option value="128k">128 kbps — good</option>
+      <option value="192k">192 kbps — high</option>
+      <option value="256k">256 kbps</option>
+      <option value="320k">320 kbps — best</option>
+    </select>
+    <p class="hint" id="bitrateHint"></p>
+  </div>
+
+  <button class="primary" id="convertBtn" disabled>Convert</button>
+
+  <div class="results" id="results"></div>
+  <div id="clearWrap"></div>
+</div>
+
+<script>
+  const fileInput     = document.getElementById('fileInput');
+  const fileList      = document.getElementById('fileList');
+  const dropZone      = document.getElementById('dropZone');
+  const convertBtn    = document.getElementById('convertBtn');
+  const formatSelect  = document.getElementById('formatSelect');
+  const channelsSel   = document.getElementById('channelsSelect');
+  const sampleRateSel = document.getElementById('sampleRateSelect');
+  const bitRateSel    = document.getElementById('bitRateSelect');
+  const bitrateHint   = document.getElementById('bitrateHint');
+  const resultsEl     = document.getElementById('results');
+  const clearWrap     = document.getElementById('clearWrap');
+
+  const LOSSLESS   = new Set(['flac', 'wav']);
+  const PREF_KEY   = 'audio-encoder-prefs';
+  let   chosenFiles = null;
+  let   activeCard  = null;   // last player interacted with — target for Space bar
+
+  // ── Persisted settings ────────────────────────────────────────────────────
+  function savePrefs() {
+    try {
+      localStorage.setItem(PREF_KEY, JSON.stringify({
+        format:     formatSelect.value,
+        channels:   channelsSel.value,
+        sampleRate: sampleRateSel.value,
+        bitRate:    bitRateSel.value,
+      }));
+    } catch {}
+  }
+  function loadPrefs() {
+    try {
+      const p = JSON.parse(localStorage.getItem(PREF_KEY) || '{}');
+      if (p.format)     formatSelect.value  = p.format;
+      if (p.channels)   channelsSel.value   = p.channels;
+      if (p.sampleRate) sampleRateSel.value = p.sampleRate;
+      if (p.bitRate)    bitRateSel.value    = p.bitRate;
+    } catch {}
+  }
+  [formatSelect, channelsSel, sampleRateSel, bitRateSel].forEach(s =>
+    s.addEventListener('change', savePrefs)
+  );
+
+  // ── Bit-rate hint ──────────────────────────────────────────────────────────
+  function updateBitrateState() {
+    const lossless = LOSSLESS.has(formatSelect.value);
+    bitRateSel.disabled = lossless;
+    bitrateHint.textContent = lossless ? 'Bit rate has no effect on lossless formats.' : '';
+  }
+  formatSelect.addEventListener('change', updateBitrateState);
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  loadPrefs();
+  updateBitrateState();
+
+  // ── File picking ───────────────────────────────────────────────────────────
+  function renderChips(files) {
+    fileList.innerHTML = '';
+    Array.from(files).forEach(f => {
+      const chip = document.createElement('span');
+      chip.className = 'file-chip';
+      chip.textContent = `${f.name} (${fmtBytes(f.size)})`;
+      fileList.appendChild(chip);
+    });
+    convertBtn.disabled = files.length === 0;
+  }
+
+  fileInput.addEventListener('change', () => { chosenFiles = fileInput.files; renderChips(chosenFiles); });
+  dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) { chosenFiles = e.dataTransfer.files; renderChips(chosenFiles); }
+  });
+
+  // ── Keyboard shortcut: Space = play/pause active player ───────────────────
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.code !== 'Space' || !activeCard?._audio) return;
+    e.preventDefault();
+    const a = activeCard._audio;
+    a.paused ? a.play() : a.pause();
+  });
+
+  // ── Conversion ────────────────────────────────────────────────────────────
+  convertBtn.addEventListener('click', async () => {
+    if (!chosenFiles?.length) return;
+
+    stopAllPlayers();
+    resultsEl.innerHTML = '';
+    clearWrap.innerHTML = '';
+    activeCard = null;
+    convertBtn.disabled = true;
+
+    const loadingCards = Array.from(chosenFiles).map(f => {
+      const el = document.createElement('div');
+      el.className = 'result-card loading';
+      el.innerHTML = `<div class="spinner"></div><span>${esc(f.name)}</span><span style="margin-left:auto;font-size:0.78rem">Converting…</span>`;
+      resultsEl.appendChild(el);
+      return el;
+    });
+
+    const form = new FormData();
+    Array.from(chosenFiles).forEach(f => form.append('files', f));
+    form.append('target_format', formatSelect.value);
+    if (channelsSel.value)                        form.append('channels',     channelsSel.value);
+    if (sampleRateSel.value)                      form.append('sample_rate',  sampleRateSel.value);
+    if (bitRateSel.value && !bitRateSel.disabled) form.append('bit_rate',     bitRateSel.value);
+
+    try {
+      const res  = await fetch('/convert', { method: 'POST', body: form });
+      const data = await res.json();
+
+      if (!res.ok) {
+        loadingCards.forEach(el => {
+          el.className = 'result-card error';
+          el.innerHTML = `<div class="err-name">${esc(data.detail || 'Request failed')}</div>`;
+        });
+        return;
+      }
+
+      let hasSuccess = false;
+      data.results.forEach((r, i) => {
+        const el = loadingCards[i];
+        if (r.error) {
+          el.className = 'result-card error';
+          el.innerHTML = `<div class="err-name">${esc(r.original)}</div><div class="err-msg">${esc(r.error)}</div>`;
+        } else {
+          el.className = 'result-card success';
+          el.innerHTML = buildPlayerHTML(r);
+          mountPlayer(el, r.stream_url);
+          startTTL(el, 300);
+          hasSuccess = true;
+        }
+      });
+
+      if (hasSuccess) showClearButton();
+    } catch {
+      loadingCards.forEach(el => {
+        el.className = 'result-card error';
+        el.innerHTML = `<div class="err-name">Network error — is the server running?</div>`;
+      });
+    } finally {
+      convertBtn.disabled = false;
+    }
+  });
+
+  // ── Clear button ──────────────────────────────────────────────────────────
+  function showClearButton() {
+    const btn = document.createElement('button');
+    btn.className = 'clear-btn';
+    btn.textContent = 'Clear results';
+    btn.onclick = () => {
+      stopAllPlayers();
+      resultsEl.innerHTML = '';
+      clearWrap.innerHTML = '';
+      activeCard = null;
+    };
+    clearWrap.appendChild(btn);
+  }
+
+  // ── Player ────────────────────────────────────────────────────────────────
+  function buildPlayerHTML(r) {
+    return `
+      <div class="card-header">
+        <span class="file-icon">🎵</span>
+        <span class="fname">${esc(r.download_name)}</span>
+        <span class="ttl-badge" title="File is automatically deleted after 5 minutes">5:00</span>
+        <a class="dl-btn" href="${esc(r.download_url)}" download="${esc(r.download_name)}">Download</a>
+      </div>
+      <div class="player">
+        <button class="play-btn" aria-label="Play">&#9654;</button>
+        <div class="player-middle">
+          <div class="progress-wrap">
+            <div class="progress-fill"></div>
+          </div>
+          <div class="time-row">
+            <span class="cur-time">0:00</span>
+            <span class="dur-time">0:00</span>
+          </div>
+        </div>
+        <div class="vol-wrap">
+          <span class="vol-icon">&#128266;</span>
+          <input type="range" class="vol" min="0" max="1" step="0.05" value="1" aria-label="Volume">
+        </div>
+      </div>`;
+  }
+
+  function mountPlayer(card, streamUrl) {
+    const audio        = new Audio(streamUrl);
+    const playBtn      = card.querySelector('.play-btn');
+    const progressWrap = card.querySelector('.progress-wrap');
+    const fill         = card.querySelector('.progress-fill');
+    const curEl        = card.querySelector('.cur-time');
+    const durEl        = card.querySelector('.dur-time');
+    const volSlider    = card.querySelector('.vol');
+    const volIcon      = card.querySelector('.vol-icon');
+
+    audio.preload = 'metadata';
+    card._audio   = audio;
+
+    // play / pause — also marks this card as the keyboard target
+    playBtn.addEventListener('click', () => {
+      activeCard = card;
+      audio.paused ? audio.play() : audio.pause();
+    });
+
+    audio.addEventListener('play', () => {
+      // pause every other active player so only one plays at a time
+      resultsEl.querySelectorAll('.result-card').forEach(c => {
+        if (c !== card && c._audio && !c._audio.paused) c._audio.pause();
+      });
+      playBtn.innerHTML = '&#9646;&#9646;';
+    });
+    audio.addEventListener('pause', () => { playBtn.innerHTML = '&#9654;'; });
+    audio.addEventListener('ended', () => {
+      playBtn.innerHTML = '&#9654;';
+      fill.style.width  = '0%';
+      curEl.textContent = '0:00';
+    });
+
+    // progress
+    audio.addEventListener('timeupdate', () => {
+      if (!audio.duration) return;
+      fill.style.width  = (audio.currentTime / audio.duration * 100) + '%';
+      curEl.textContent = fmt(audio.currentTime);
+    });
+    audio.addEventListener('loadedmetadata', () => { durEl.textContent = fmt(audio.duration); });
+
+    // seek
+    progressWrap.addEventListener('click', e => {
+      if (!audio.duration) return;
+      const rect = progressWrap.getBoundingClientRect();
+      audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration;
+    });
+
+    // volume
+    volSlider.addEventListener('input', () => { audio.volume = volSlider.value; });
+    volIcon.addEventListener('click', () => {
+      audio.muted       = !audio.muted;
+      volIcon.innerHTML = audio.muted ? '&#128263;' : '&#128266;';
+    });
+  }
+
+  // ── TTL countdown ─────────────────────────────────────────────────────────
+  function startTTL(card, seconds) {
+    const badge   = card.querySelector('.ttl-badge');
+    const dlBtn   = card.querySelector('.dl-btn');
+    const playBtn = card.querySelector('.play-btn');
+    let remaining = seconds;
+
+    const tick = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(tick);
+        badge.textContent = 'Expired';
+        badge.classList.add('expired');
+        dlBtn.classList.add('disabled');
+        dlBtn.removeAttribute('href');
+        dlBtn.removeAttribute('download');
+        card.classList.add('expired-card');
+        stopPlayer(card);
+        playBtn.disabled = true;
+        return;
+      }
+      badge.textContent = fmt(remaining);
+      if (remaining <= 60) badge.classList.add('warning');
+    }, 1000);
+  }
+
+  // ── Player cleanup ────────────────────────────────────────────────────────
+  function stopPlayer(card) {
+    if (card._audio) {
+      card._audio.pause();
+      card._audio.src = '';
+      card._audio = null;
+    }
+  }
+  function stopAllPlayers() {
+    resultsEl.querySelectorAll('.result-card').forEach(stopPlayer);
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────────────
+  function fmt(s) {
+    const m   = Math.floor(s / 60);
+    const sec = Math.floor(s % 60).toString().padStart(2, '0');
+    return `${m}:${sec}`;
+  }
+  function fmtBytes(b) {
+    if (b < 1024)           return `${b} B`;
+    if (b < 1024 * 1024)    return `${(b / 1024).toFixed(1)} KB`;
+    return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>
